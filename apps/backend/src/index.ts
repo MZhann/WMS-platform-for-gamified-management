@@ -12,14 +12,18 @@ import adminRoutes from "./routes/admin"
 dotenv.config()
 
 const app = express()
-const PORT = process.env.PORT || 3001
+const PORT = parseInt(process.env.PORT || "3001", 10)
 
-// Middleware
-app.use(cors())
+// CORS - allow frontend origin in production, or all origins in development
+const corsOrigins = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean)
+app.use(cors(corsOrigins?.length ? { origin: corsOrigins, credentials: true } : {}))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Health check endpoint
+// Health check endpoints (for Railway, load balancers, etc.)
+app.get("/", (req, res) => {
+  res.json({ status: "ok", message: "WMS API is running", version: "1.0" })
+})
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Server is running" })
 })
@@ -48,8 +52,8 @@ const startServer = async () => {
     await seedAdminUser()
 
     // Start Express server
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`)
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on port ${PORT}`)
       console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`)
     })
   } catch (error) {

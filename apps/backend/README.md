@@ -115,6 +115,19 @@ Check if the server is running.
 }
 ```
 
+## Deployment (Railway)
+
+1. **Create a Railway project** and connect your repo
+2. **Add MongoDB** – Use Railway's MongoDB addon or MongoDB Atlas
+3. **Set environment variables** in Railway dashboard:
+   - `MONGODB_URI` – MongoDB connection string
+   - `JWT_SECRET` – Long random string (e.g. `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`)
+   - `CORS_ORIGIN` – Your frontend URL (e.g. `https://your-app.vercel.app`)
+4. **Deploy** – Railway auto-detects Node.js and runs `npm install`, `npm run build`, `npm run start`
+5. **Health check** – Railway uses root `/` or `/health` for health checks
+
+The backend exposes APIs at `https://your-backend.railway.app/api/*`. Set `NEXT_PUBLIC_API_URL=https://your-backend.railway.app/api` in your frontend.
+
 ## Features
 
 - ✅ User registration with email, password, and name
