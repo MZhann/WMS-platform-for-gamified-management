@@ -6,13 +6,15 @@ A root `package.json` and `nixpacks.toml` are configured so Railway/Railpack can
 
 ### Step 2: Environment Variables
 
-In Railway → Variables, add:
+In Railway → your **backend service** → **Variables** tab, add:
 
-| Variable      | Required | Example                                              |
-|---------------|----------|------------------------------------------------------|
-| `MONGODB_URI` | Yes      | `mongodb+srv://user:pass@cluster.mongodb.net/wms`   |
-| `JWT_SECRET`  | Yes      | Long random string (64+ chars)                       |
-| `CORS_ORIGIN` | Yes*     | `https://your-frontend.vercel.app`                   |
+| Variable      | Required | Where to get it                                                |
+|---------------|----------|----------------------------------------------------------------|
+| `MONGODB_URI` | Yes      | MongoDB Atlas connection string, or Railway MongoDB addon link |
+| `JWT_SECRET`| Yes      | Run: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
+| `CORS_ORIGIN` | Yes*     | Your frontend URL, e.g. `https://your-app.vercel.app`          |
+
+**If using Railway MongoDB addon:** Add the MongoDB service, then in your backend service → Variables → **Reference** → choose the MongoDB service’s `MONGO_URL`. Or add a variable `MONGODB_URI` and paste the connection string.
 
 \*Required for production CORS; optional for development.
 

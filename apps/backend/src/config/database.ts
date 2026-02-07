@@ -1,11 +1,17 @@
 import mongoose from "mongoose"
 
+// Support multiple env var names (Railway uses MONGO_URL, we use MONGODB_URI)
+const getMongoUri = (): string | undefined =>
+  process.env.MONGODB_URI || process.env.MONGO_URL || process.env.DATABASE_URL || process.env.MONGO_URI
+
 export const connectDatabase = async (): Promise<void> => {
   try {
-    const mongoUri = process.env.MONGODB_URI
+    const mongoUri = getMongoUri()
 
     if (!mongoUri) {
-      throw new Error("MONGODB_URI is not defined in environment variables")
+      throw new Error(
+        "MongoDB URI not found. Set MONGODB_URI, MONGO_URL, or DATABASE_URL in Railway Variables."
+      )
     }
 
     await mongoose.connect(mongoUri)
