@@ -23,6 +23,10 @@ npm run dev
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Deployment
+
+This is a monorepo. For **Railway** backend deployment, see [DEPLOYMENT.md](./DEPLOYMENT.md). Set **Root Directory** to `apps/backend` in Railway so Railpack detects the Node.js app.
+
 ## Features
 
 - Interactive Mapbox map centered on Almaty
