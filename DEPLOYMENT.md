@@ -2,17 +2,7 @@
 
 ## Backend (Railway)
 
-Railway analyzes the **root** of your repo by default. Since this is a monorepo, the backend is in `apps/backend/`. You must set the **Root Directory** for the backend service.
-
-### Step 1: Set Root Directory
-
-1. Open your Railway project
-2. Select the **backend** service (or create one)
-3. Go to **Settings** → **Source** (or **Deploy**)
-4. Set **Root Directory** to: `apps/backend`
-5. Save
-
-Railway will then build from `apps/backend`, where `package.json` is located, and Railpack will detect the Node.js app.
+A root `package.json` and `nixpacks.toml` are configured so Railway/Railpack can deploy from the **repo root** without changing settings. Railpack detects Node.js and runs the backend from `apps/backend`.
 
 ### Step 2: Environment Variables
 

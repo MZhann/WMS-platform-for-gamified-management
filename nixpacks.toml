@@ -1,0 +1,14 @@
+# Root nixpacks config - deploys backend from apps/backend
+# Railpack detects Node.js from package.json and uses these phases
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["cd apps/backend && npm install"]
+
+[phases.build]
+cmds = ["cd apps/backend && npm run build"]
+
+[start]
+cmd = "cd apps/backend && npm run start"
