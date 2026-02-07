@@ -2,8 +2,11 @@ import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
 import { connectDatabase } from "./config/database"
+import { seedAdminUser } from "./config/seedAdmin"
 import authRoutes from "./routes/auth"
 import warehouseRoutes from "./routes/warehouses"
+import supportRoutes from "./routes/support"
+import adminRoutes from "./routes/admin"
 
 // Load environment variables
 dotenv.config()
@@ -24,6 +27,8 @@ app.get("/health", (req, res) => {
 // Routes
 app.use("/api/auth", authRoutes)
 app.use("/api/warehouses", warehouseRoutes)
+app.use("/api/support", supportRoutes)
+app.use("/api/admin", adminRoutes)
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -38,6 +43,9 @@ const startServer = async () => {
   try {
     // Connect to MongoDB
     await connectDatabase()
+
+    // Seed admin user if not exists
+    await seedAdminUser()
 
     // Start Express server
     app.listen(PORT, () => {

@@ -6,6 +6,7 @@ export interface AuthRequest extends Request {
     id: string
     email: string
     name: string
+    isAdmin?: boolean
   }
 }
 
@@ -32,9 +33,15 @@ export const authenticate = (
       id: string
       email: string
       name: string
+      isAdmin?: boolean
     }
 
-    req.user = decoded
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      name: decoded.name,
+      isAdmin: decoded.isAdmin ?? false,
+    }
     next()
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -43,4 +50,16 @@ export const authenticate = (
     }
     res.status(500).json({ error: "Authentication error" })
   }
+}
+
+export const requireAdmin = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" })
+    return
+  }
+  next()
 }

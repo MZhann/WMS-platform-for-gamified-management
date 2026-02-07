@@ -36,7 +36,12 @@ router.post("/register", async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = jwt.sign(
-      { id: user._id.toString(), email: user.email, name: user.name },
+      {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        isAdmin: (user as any).isAdmin ?? false,
+      },
       jwtSecret,
       { expiresIn: "7d" }
     )
@@ -48,6 +53,7 @@ router.post("/register", async (req: Request, res: Response): Promise<void> => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        isAdmin: (user as any).isAdmin ?? false,
       },
     })
   } catch (error: any) {
@@ -95,7 +101,12 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = jwt.sign(
-      { id: user._id.toString(), email: user.email, name: user.name },
+      {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        isAdmin: (user as any).isAdmin ?? false,
+      },
       jwtSecret,
       { expiresIn: "7d" }
     )
@@ -107,6 +118,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        isAdmin: (user as any).isAdmin ?? false,
       },
     })
   } catch (error: any) {
@@ -135,6 +147,7 @@ router.get("/me", async (req: Request, res: Response): Promise<void> => {
       id: string
       email: string
       name: string
+      isAdmin?: boolean
     }
 
     const user = await User.findById(decoded.id)
@@ -148,6 +161,7 @@ router.get("/me", async (req: Request, res: Response): Promise<void> => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        isAdmin: (user as any).isAdmin ?? false,
       },
     })
   } catch (error: any) {

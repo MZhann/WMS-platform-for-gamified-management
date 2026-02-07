@@ -9,7 +9,8 @@ import {
   Settings, 
   HelpCircle,
   MapPin,
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
   { name: "Support", href: "/support", icon: HelpCircle },
+  { name: "Admin panel", href: "/admin", icon: Shield, adminOnly: true },
 ]
 
 export function Sidebar() {
@@ -35,6 +37,7 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigation.map((item) => {
+          if ("adminOnly" in item && item.adminOnly && !user?.isAdmin) return null
           const isActive = pathname === item.href
           const Icon = item.icon
           return (

@@ -4,6 +4,7 @@ export interface User {
   id: string
   email: string
   name: string
+  isAdmin?: boolean
 }
 
 export interface AuthResponse {
@@ -139,6 +140,48 @@ export const warehouseApi = {
 
   delete: async (id: string): Promise<{ message: string }> => {
     return apiCall<{ message: string }>(`/warehouses/${id}`, {
+      method: "DELETE",
+    })
+  },
+}
+
+// Support API functions
+export interface SupportCommentData {
+  name: string
+  email: string
+  message: string
+}
+
+export const supportApi = {
+  createComment: async (
+    data: SupportCommentData
+  ): Promise<{ message: string; comment: { id: string; name: string; email: string; message: string; createdAt: string } }> => {
+    return apiCall<{ message: string; comment: { id: string; name: string; email: string; message: string; createdAt: string } }>(
+      "/support/comments",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    )
+  },
+}
+
+// Admin API functions (requires admin user)
+export interface SupportCommentItem {
+  id: string
+  name: string
+  email: string
+  message: string
+  createdAt: string
+}
+
+export const adminApi = {
+  getComments: async (): Promise<{ comments: SupportCommentItem[] }> => {
+    return apiCall<{ comments: SupportCommentItem[] }>("/admin/comments")
+  },
+
+  deleteComment: async (id: string): Promise<{ message: string }> => {
+    return apiCall<{ message: string }>(`/admin/comments/${id}`, {
       method: "DELETE",
     })
   },

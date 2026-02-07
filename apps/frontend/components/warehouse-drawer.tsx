@@ -33,8 +33,8 @@ export function WarehouseDrawer({
 
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className="max-h-[80vh]">
-        <DrawerHeader>
+      <DrawerContent className="flex h-[90vh] max-h-[90vh] flex-col">
+        <DrawerHeader className="flex-shrink-0">
           <DrawerTitle className="text-2xl">{warehouse.name}</DrawerTitle>
           <DrawerDescription className="text-base">
             {warehouse.description || "No description available"}
@@ -46,7 +46,7 @@ export function WarehouseDrawer({
             </p>
           </div>
         </DrawerHeader>
-        <div className="px-4 pb-4 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           <div className="mt-4">
             <h3 className="text-lg font-semibold mb-3">Products</h3>
             {products.length === 0 ? (
