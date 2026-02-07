@@ -7,7 +7,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer"
-import { Warehouse } from "@/app/page"
+import type { Warehouse } from "@/lib/api"
 
 export interface Product {
   id: string
