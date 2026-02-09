@@ -1,3 +1,4 @@
+/** Backend base URL from env (e.g. http://localhost:3001/api). Set NEXT_PUBLIC_API_URL in .env */
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
 
 export interface User {
