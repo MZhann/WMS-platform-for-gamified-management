@@ -1,5 +1,10 @@
 import mongoose, { Document, Schema } from "mongoose"
 
+export interface IWarehouseInventoryItem {
+  typeName: string
+  count: number
+}
+
 export interface IWarehouse extends Document {
   name: string
   description: string
@@ -9,6 +14,7 @@ export interface IWarehouse extends Document {
     lng: number
   }
   userId: mongoose.Types.ObjectId
+  inventory: IWarehouseInventoryItem[]
   createdAt: Date
   updatedAt: Date
 }
@@ -44,6 +50,15 @@ const WarehouseSchema = new Schema<IWarehouse>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: [true, "User ID is required"],
+    },
+    inventory: {
+      type: [
+        {
+          typeName: { type: String, required: true, trim: true },
+          count: { type: Number, required: true, min: 0 },
+        },
+      ],
+      default: [],
     },
   },
   {

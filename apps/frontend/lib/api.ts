@@ -24,6 +24,11 @@ export interface RegisterCredentials {
   name: string
 }
 
+export interface WarehouseInventoryItem {
+  typeName: string
+  count: number
+}
+
 export interface Warehouse {
   id: string
   name: string
@@ -32,6 +37,9 @@ export interface Warehouse {
   coordinates: [number, number]
   createdAt?: string
   updatedAt?: string
+  inventory?: WarehouseInventoryItem[]
+  totalItems?: number
+  typeCount?: number
 }
 
 export interface CreateWarehouseData {
@@ -39,6 +47,94 @@ export interface CreateWarehouseData {
   description: string
   address: string
   coordinates: [number, number]
+}
+
+export interface WarehouseInventoryUpdate {
+  inventory: WarehouseInventoryItem[]
+}
+
+export type FlowOperation = "load" | "unload"
+
+export interface FlowItem {
+  typeName: string
+  count: number
+  unitPrice: number
+}
+
+export interface WarehouseFlowEntry {
+  id: string
+  warehouseId: string
+  operation: FlowOperation
+  items: FlowItem[]
+  performedBy?: string
+  createdAt: string
+}
+
+export interface PostFlowData {
+  operation: FlowOperation
+  items: FlowItem[]
+}
+
+export interface GetFlowResponse {
+  flows: WarehouseFlowEntry[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface WarehouseAnalyticsSummary {
+  totalItems: number
+  typeCount: number
+  totalIncomingValue: number
+  totalOutgoingValue: number
+  totalIncomingCount: number
+  totalOutgoingCount: number
+}
+
+export interface WarehouseFlowTimeSeriesItem {
+  period: string
+  periodLabel: string
+  incomingCount: number
+  outgoingCount: number
+  incomingValue: number
+  outgoingValue: number
+}
+
+export interface WarehouseFlowByTypeItem {
+  typeName: string
+  loaded: number
+  unloaded: number
+}
+
+export interface WarehouseAnalyticsResponse {
+  summary: WarehouseAnalyticsSummary
+  inventoryByType: WarehouseInventoryItem[]
+  flowTimeSeries: WarehouseFlowTimeSeriesItem[]
+  flowByType: WarehouseFlowByTypeItem[]
+}
+
+export interface AiAdviceTable {
+  title: string
+  headers: string[]
+  rows: string[][]
+}
+
+export interface AiAdviceChartSeries {
+  name: string
+  values: number[]
+}
+
+export interface AiAdviceChartSuggestion {
+  type: "bar" | "line"
+  title: string
+  data: { labels: string[]; series: AiAdviceChartSeries[] }
+}
+
+export interface AiAdviceResponse {
+  summary: string
+  recommendations: string[]
+  tables: AiAdviceTable[]
+  chartSuggestions: AiAdviceChartSuggestion[]
 }
 
 // Get token from localStorage
@@ -139,6 +235,82 @@ export const warehouseApi = {
     return apiCall<{ message: string }>(`/warehouses/${id}`, {
       method: "DELETE",
     })
+  },
+
+  updateInventory: async (
+    id: string,
+    data: WarehouseInventoryUpdate
+  ): Promise<{ warehouse: Warehouse; message: string }> => {
+    return apiCall<{ warehouse: Warehouse; message: string }>(`/warehouses/${id}/inventory`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  },
+
+  uploadInventoryCsv: async (
+    id: string,
+    file: File
+  ): Promise<{ warehouse: Warehouse; message: string }> => {
+    const token = getToken()
+    const formData = new FormData()
+    formData.append("file", file)
+    const headers: Record<string, string> = {
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }
+    const response = await fetch(`${API_BASE_URL}/warehouses/${id}/inventory/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Unknown error" }))
+      throw new Error(error.error || `HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  },
+
+  postFlow: async (
+    id: string,
+    data: PostFlowData
+  ): Promise<{ warehouse: Warehouse; flow: WarehouseFlowEntry; message: string }> => {
+    return apiCall<{ warehouse: Warehouse; flow: WarehouseFlowEntry; message: string }>(
+      `/warehouses/${id}/flow`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    )
+  },
+
+  getFlow: async (
+    id: string,
+    params?: { page?: number; limit?: number }
+  ): Promise<GetFlowResponse> => {
+    const search = new URLSearchParams()
+    if (params?.page != null) search.set("page", String(params.page))
+    if (params?.limit != null) search.set("limit", String(params.limit))
+    const qs = search.toString()
+    return apiCall<GetFlowResponse>(`/warehouses/${id}/flow${qs ? `?${qs}` : ""}`, {
+      method: "GET",
+    })
+  },
+
+  getAnalytics: async (
+    id: string,
+    params?: { period?: "day" | "week" | "month"; periods?: number }
+  ): Promise<WarehouseAnalyticsResponse> => {
+    const search = new URLSearchParams()
+    if (params?.period != null) search.set("period", params.period)
+    if (params?.periods != null) search.set("periods", String(params.periods))
+    const qs = search.toString()
+    return apiCall<WarehouseAnalyticsResponse>(
+      `/warehouses/${id}/analytics${qs ? `?${qs}` : ""}`,
+      { method: "GET" }
+    )
+  },
+
+  getAiAdvice: async (id: string): Promise<AiAdviceResponse> => {
+    return apiCall<AiAdviceResponse>(`/warehouses/${id}/ai-advice`, { method: "GET" })
   },
 }
 
