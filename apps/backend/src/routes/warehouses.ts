@@ -1,10 +1,10 @@
 import { Router, Response } from "express"
 import multer from "multer"
 import { parse } from "csv-parse/sync"
-import { GoogleGenAI } from "@google/genai"
 import { Warehouse, IWarehouseInventoryItem } from "../models/Warehouse"
 import { WarehouseFlow, IWarehouseFlowItem, WarehouseFlowOperation } from "../models/WarehouseFlow"
 import { authenticate, AuthRequest } from "../middleware/auth"
+import { callGemini } from "../utils/gemini"
 
 const router = Router()
 
@@ -463,7 +463,90 @@ function parseAiAdviceResponse(rawContent: string): AiAdviceParsed {
   }
 }
 
-// Get AI-generated buy/sell advice for a warehouse
+// Generate data-driven advice without AI
+function generateAlgorithmicAdvice(data: WarehouseAnalyticsData): AiAdviceParsed {
+  const recommendations: string[] = []
+  const { summary, inventoryByType, flowByType } = data
+
+  if (summary.totalItems === 0) {
+    return {
+      summary: "Warehouse is empty. Start by stocking essential items to begin operations.",
+      recommendations: ["Add inventory items to start tracking flow", "Set up receiving and shipping zones"],
+      tables: [],
+      chartSuggestions: [],
+    }
+  }
+
+  const totalIn = summary.totalIncomingValue
+  const totalOut = summary.totalOutgoingValue
+  if (totalOut > totalIn * 1.3) {
+    recommendations.push(`Outgoing value ($${totalOut.toLocaleString()}) significantly exceeds incoming ($${totalIn.toLocaleString()}). Consider restocking high-demand items soon.`)
+  } else if (totalIn > totalOut * 2) {
+    recommendations.push(`Incoming value ($${totalIn.toLocaleString()}) is much higher than outgoing ($${totalOut.toLocaleString()}). You may be overstocking — slow down purchases or run promotions.`)
+  }
+
+  const highDemand = flowByType
+    .filter(f => f.unloaded > f.loaded * 1.5 && f.unloaded > 0)
+    .sort((a, b) => b.unloaded - a.unloaded)
+  for (const item of highDemand.slice(0, 3)) {
+    recommendations.push(`"${item.typeName}" is being consumed faster than restocked (${item.unloaded} out vs ${item.loaded} in). Consider reordering.`)
+  }
+
+  const overstocked = flowByType
+    .filter(f => f.loaded > f.unloaded * 2 && f.loaded > 0)
+    .sort((a, b) => b.loaded - a.loaded)
+  for (const item of overstocked.slice(0, 3)) {
+    recommendations.push(`"${item.typeName}" may be overstocked (${item.loaded} in vs ${item.unloaded} out). Consider reducing orders or discounting.`)
+  }
+
+  const dormant = inventoryByType
+    .filter(inv => {
+      const flow = flowByType.find(f => f.typeName === inv.typeName)
+      return inv.count > 0 && (!flow || (flow.loaded === 0 && flow.unloaded === 0))
+    })
+  if (dormant.length > 0) {
+    recommendations.push(`${dormant.length} item type(s) have stock but zero recent movement: ${dormant.slice(0, 3).map(d => `"${d.typeName}"`).join(", ")}. Consider clearance.`)
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push("Inventory levels appear balanced. Continue monitoring flow trends for seasonal shifts.")
+  }
+
+  const overallSummary = `Warehouse holds ${summary.totalItems.toLocaleString()} items across ${summary.typeCount} types. Total incoming value: $${totalIn.toLocaleString()}, outgoing: $${totalOut.toLocaleString()}.`
+
+  const tables: AiAdviceTable[] = []
+  if (flowByType.length > 0) {
+    tables.push({
+      title: "Top Product Flow",
+      headers: ["Product", "Loaded", "Unloaded", "Net"],
+      rows: flowByType.slice(0, 8).map(f => [
+        f.typeName,
+        f.loaded.toLocaleString(),
+        f.unloaded.toLocaleString(),
+        (f.loaded - f.unloaded).toLocaleString(),
+      ]),
+    })
+  }
+
+  const chartSuggestions: AiAdviceChartSuggestion[] = []
+  if (flowByType.length > 0) {
+    chartSuggestions.push({
+      type: "bar",
+      title: "Loaded vs Unloaded by Product",
+      data: {
+        labels: flowByType.slice(0, 8).map(f => f.typeName),
+        series: [
+          { name: "Loaded", values: flowByType.slice(0, 8).map(f => f.loaded) },
+          { name: "Unloaded", values: flowByType.slice(0, 8).map(f => f.unloaded) },
+        ],
+      },
+    })
+  }
+
+  return { summary: overallSummary, recommendations, tables, chartSuggestions }
+}
+
+// Get AI-generated buy/sell advice for a warehouse (with algorithmic fallback)
 router.get("/:id/ai-advice", async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.user) {
@@ -480,60 +563,42 @@ router.get("/:id/ai-advice", async (req: AuthRequest, res: Response): Promise<vo
       return
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-      res.status(503).json({ error: "AI advice is not configured (missing GEMINI_API_KEY)" })
-      return
-    }
-
     const data = await getWarehouseAnalyticsData(warehouse, "month", 6)
-    const now = new Date()
-    const context = {
-      warehouse: {
-        name: warehouse.name,
-        address: warehouse.address,
-      },
-      currentDate: now.toISOString().slice(0, 10),
-      season: now.getMonth() + 1,
-      summary: data.summary,
-      flowTimeSeries: data.flowTimeSeries,
-      inventoryByType: data.inventoryByType,
-      flowByType: data.flowByType,
-    }
 
-    const systemPrompt = `You are an expert in warehouse and inventory management. Your task is to give short, actionable advice on what to BUY (restock) and what to SELL or REDUCE, based on the provided warehouse data and current date/season. Tie your reasoning to the numbers.`
+    try {
+      const now = new Date()
+      const context = {
+        warehouse: { name: warehouse.name, address: warehouse.address },
+        currentDate: now.toISOString().slice(0, 10),
+        season: now.getMonth() + 1,
+        summary: data.summary,
+        flowTimeSeries: data.flowTimeSeries,
+        inventoryByType: data.inventoryByType,
+        flowByType: data.flowByType,
+      }
 
-    const userPrompt = `Analyze this warehouse and respond with a single JSON object only (no markdown, no other text). Use this exact structure:
-{
-  "summary": "1-2 sentence overview of the situation and main recommendation",
-  "recommendations": ["bullet 1", "bullet 2", "..."],
-  "tables": [{ "title": "optional table title", "headers": ["Col1", "Col2"], "rows": [["a","b"], ["c","d"]] }],
-  "chartSuggestions": [{ "type": "bar" or "line", "title": "Chart title", "data": { "labels": ["A","B","C"], "series": [{ "name": "Series name", "values": [1,2,3] }] } }]
-}
-You may leave "tables" and "chartSuggestions" as empty arrays [] if you do not need them.
+      const prompt = `You are an expert in warehouse and inventory management. Give short, actionable advice on what to BUY and what to SELL/REDUCE based on the data below. Tie reasoning to numbers.
 
-Warehouse and analytics data (JSON):
+Respond with a single JSON object only (no markdown):
+{"summary":"1-2 sentence overview","recommendations":["bullet 1","bullet 2"],"tables":[{"title":"Table title","headers":["Col1","Col2"],"rows":[["a","b"]]}],"chartSuggestions":[{"type":"bar","title":"Chart title","data":{"labels":["A","B"],"series":[{"name":"Series","values":[1,2]}]}}]}
+
+You may leave "tables" and "chartSuggestions" as empty arrays.
+
+Warehouse data:
 ${JSON.stringify(context, null, 2)}`
 
-    const ai = new GoogleGenAI({ apiKey })
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: `${systemPrompt}\n\n${userPrompt}`,
-      config: {
-        temperature: 0.3,
-        maxOutputTokens: 2000,
-      },
-    })
+      const rawContent = await callGemini(prompt, { temperature: 0.3, maxOutputTokens: 2000 })
+      const parsed = parseAiAdviceResponse(rawContent)
+      res.json({ ...parsed, source: "ai" })
+      return
+    } catch (aiErr: any) {
+      console.warn("AI advice failed, using algorithmic fallback:", aiErr?.message || aiErr)
+    }
 
-    const rawContent = response.text ?? ""
-    const parsed = parseAiAdviceResponse(rawContent)
-    res.json(parsed)
+    const fallback = generateAlgorithmicAdvice(data)
+    res.json({ ...fallback, source: "algorithm" })
   } catch (error: any) {
     console.error("AI advice error:", error)
-    if (error?.status === 429) {
-      res.status(503).json({ error: "AI rate limit exceeded. Try again later." })
-      return
-    }
     res.status(500).json({ error: "Internal server error" })
   }
 })
