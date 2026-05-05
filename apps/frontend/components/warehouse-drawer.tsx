@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "react-i18next"
 import {
   Drawer,
   DrawerContent,
@@ -29,6 +30,8 @@ export function WarehouseDrawer({
   warehouse,
   products,
 }: WarehouseDrawerProps) {
+  const { t } = useTranslation()
+
   if (!warehouse) return null
 
   return (
@@ -37,20 +40,20 @@ export function WarehouseDrawer({
         <DrawerHeader className="flex-shrink-0">
           <DrawerTitle className="text-2xl">{warehouse.name}</DrawerTitle>
           <DrawerDescription className="text-base">
-            {warehouse.description || "No description available"}
+            {warehouse.description || t("warehouseDrawer.noDescription")}
           </DrawerDescription>
           <div className="mt-2 text-sm text-muted-foreground">
             <p>{warehouse.address}</p>
             <p className="mt-1">
-              Coordinates: {warehouse.coordinates[1].toFixed(6)}, {warehouse.coordinates[0].toFixed(6)}
+              {t("warehouseDrawer.coordinates")}: {warehouse.coordinates[1].toFixed(6)}, {warehouse.coordinates[0].toFixed(6)}
             </p>
           </div>
         </DrawerHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-3">Products</h3>
+            <h3 className="text-lg font-semibold mb-3">{t("warehouseDrawer.products")}</h3>
             {products.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No products in this warehouse</p>
+              <p className="text-sm text-muted-foreground">{t("warehouseDrawer.noProducts")}</p>
             ) : (
               <div className="space-y-2">
                 {products.map((product) => (
@@ -61,12 +64,12 @@ export function WarehouseDrawer({
                     <div className="flex-1">
                       <p className="font-medium">{product.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        Quantity: {product.quantity}
+                        {t("warehouseDrawer.quantity")}: {product.quantity}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">${product.price.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">per unit</p>
+                      <p className="text-xs text-muted-foreground">{t("warehouseDrawer.perUnit")}</p>
                     </div>
                   </div>
                 ))}

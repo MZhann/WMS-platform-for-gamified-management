@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 import { WarehouseFormModal } from "@/components/warehouse-form-modal"
@@ -8,13 +9,10 @@ import { WarehouseDrawer, Product } from "@/components/warehouse-drawer"
 import { ProtectedRoute } from "@/components/protected-route"
 import { warehouseApi, Warehouse as ApiWarehouse } from "@/lib/api"
 
-// Alias for compatibility
 type Warehouse = ApiWarehouse
 
-// Almaty coordinates
 const ALMATY_CENTER: [number, number] = [76.9126, 43.2220]
 
-// Generate fake products for a warehouse
 function generateFakeProducts(warehouseId: string): Product[] {
   const productNames = [
     "Laptop Computer",
@@ -31,7 +29,7 @@ function generateFakeProducts(warehouseId: string): Product[] {
     "Power Adapter",
   ]
 
-  const count = Math.floor(Math.random() * 8) + 3 // 3-10 products
+  const count = Math.floor(Math.random() * 8) + 3
   const selectedProducts = productNames
     .sort(() => Math.random() - 0.5)
     .slice(0, count)
@@ -45,6 +43,7 @@ function generateFakeProducts(warehouseId: string): Product[] {
 }
 
 export default function Home() {
+  const { t } = useTranslation()
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
@@ -57,7 +56,6 @@ export default function Home() {
   const [warehouseProducts, setWarehouseProducts] = useState<Record<string, Product[]>>({})
   const [loadingWarehouses, setLoadingWarehouses] = useState(true)
 
-  // Load warehouses from backend on mount
   useEffect(() => {
     const loadWarehouses = async () => {
       try {
@@ -77,17 +75,15 @@ export default function Home() {
   useEffect(() => {
     if (!mapContainer.current || map.current) return
 
-    // Initialize map
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ""
     mapboxgl.accessToken = token
     
     if (!token) {
-      setMapError("Mapbox token is missing. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your .env.local file")
-      console.error("Mapbox token is missing. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your .env.local file")
+      setMapError(t("map.tokenMissing"))
+      console.error("Mapbox token is missing")
       return
     }
 
-    // Wait a bit to ensure container is fully rendered
     const initMap = () => {
       if (!mapContainer.current) return
 
@@ -99,30 +95,26 @@ export default function Home() {
           zoom: 12,
         })
 
-        // Handle map clicks
         map.current.on("click", (e) => {
           const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat]
           setClickedCoordinates(coords)
           setIsModalOpen(true)
         })
 
-        // Handle map load
         map.current.on("load", () => {
           setMapError(null)
         })
 
-        // Handle map errors
         map.current.on("error", (e) => {
           console.error("Map error:", e)
-          setMapError("Failed to load map. Please check your Mapbox token.")
+          setMapError(t("map.failedToLoad"))
         })
       } catch (error) {
         console.error("Error initializing map:", error)
-        setMapError("Failed to initialize map. Please check your Mapbox token.")
+        setMapError(t("map.failedToInit"))
       }
     }
 
-    // Small delay to ensure DOM is ready
     const timer = setTimeout(initMap, 100)
 
     return () => {
@@ -134,15 +126,12 @@ export default function Home() {
     }
   }, [])
 
-  // Add markers when warehouses change
   useEffect(() => {
     if (!map.current) return
 
-    // Remove existing markers
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    // Add new markers
     warehouses.forEach((warehouse) => {
       const el = document.createElement("div")
       el.className = "warehouse-marker"
@@ -154,7 +143,6 @@ export default function Home() {
       el.style.cursor = "pointer"
       el.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)"
 
-      // Generate products for this warehouse if not already generated
       if (!warehouseProducts[warehouse.id]) {
         setWarehouseProducts((prev) => ({
           ...prev,
@@ -166,7 +154,6 @@ export default function Home() {
         .setLngLat(warehouse.coordinates)
         .addTo(map.current!)
 
-      // Handle marker click to open drawer
       el.addEventListener("click", (e) => {
         e.stopPropagation()
         setSelectedWarehouse(warehouse)
@@ -180,7 +167,6 @@ export default function Home() {
 
   const handleWarehouseSubmit = async (warehouse: Omit<Warehouse, "id">) => {
     try {
-      // Save to backend
       const response = await warehouseApi.create({
         name: warehouse.name,
         description: warehouse.description,
@@ -188,10 +174,8 @@ export default function Home() {
         coordinates: warehouse.coordinates,
       })
 
-      // Add to local state
       setWarehouses((prev) => [...prev, response.warehouse])
       
-      // Generate products for the new warehouse
       setWarehouseProducts((prev) => ({
         ...prev,
         [response.warehouse.id]: generateFakeProducts(response.warehouse.id),
@@ -201,7 +185,7 @@ export default function Home() {
       setClickedCoordinates(null)
     } catch (error: any) {
       console.error("Failed to create warehouse:", error)
-      alert(error.message || "Failed to create warehouse. Please try again.")
+      alert(error.message || t("map.createFailed"))
     }
   }
 
@@ -211,7 +195,7 @@ export default function Home() {
         <div ref={mapContainer} className="h-full w-full" />
         {mapError && (
           <div className="absolute top-4 left-4 right-4 z-50 bg-red-500 text-white p-4 rounded-lg shadow-lg max-w-md">
-            <p className="font-semibold">Map Error</p>
+            <p className="font-semibold">{t("map.mapError")}</p>
             <p className="text-sm">{mapError}</p>
           </div>
         )}

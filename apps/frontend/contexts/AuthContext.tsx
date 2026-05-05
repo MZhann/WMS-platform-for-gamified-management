@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import { User, authApi, getToken, setToken, removeToken } from "@/lib/api"
 import { useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 
 interface AuthContextType {
   user: User | null
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const { t } = useTranslation()
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user)
       router.push("/")
     } catch (error: any) {
-      throw new Error(error.message || "Login failed")
+      throw new Error(error.message || t("auth.loginFailedGeneric"))
     }
   }
 
@@ -62,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user)
       router.push("/")
     } catch (error: any) {
-      throw new Error(error.message || "Registration failed")
+      throw new Error(error.message || t("auth.registrationFailedGeneric"))
     }
   }
 

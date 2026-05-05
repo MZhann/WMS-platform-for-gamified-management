@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -44,6 +44,8 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { InventoryCombobox } from "@/components/inventory-combobox";
+import { useTranslation } from "react-i18next";
 
 function parseFlowCsv(file: File): Promise<FlowItem[]> {
   return new Promise((resolve, reject) => {
@@ -117,6 +119,7 @@ function parseFlowCsv(file: File): Promise<FlowItem[]> {
 }
 
 export default function WarehouseDetailPage() {
+  const { t } = useTranslation();
   const params = useParams();
   const id = params?.id as string;
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
@@ -133,10 +136,6 @@ export default function WarehouseDetailPage() {
   const [operationSubmitting, setOperationSubmitting] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [activeTypeSuggestIndex, setActiveTypeSuggestIndex] = useState<
-    number | null
-  >(null);
-  const typeSuggestBlurRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadWarehouse = useCallback(async () => {
     if (!id) {
@@ -154,7 +153,7 @@ export default function WarehouseDetailPage() {
       setWarehouse(whRes.warehouse);
       setFlows(flowRes.flows);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to load warehouse";
+      const msg = e instanceof Error ? e.message : t("warehouses.failedToLoad");
       setError(msg);
       if (msg.includes("404") || msg.toLowerCase().includes("not found")) {
         setNotFound(true);
@@ -176,34 +175,6 @@ export default function WarehouseDetailPage() {
       (warehouse?.inventory ?? []).map((i) => i.typeName.trim()).filter(Boolean)
     )
   ).sort();
-
-  const getTypeSuggestions = (query: string, limit = 8) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return existingTypeNames.slice(0, limit);
-    return existingTypeNames
-      .filter((name) => name.toLowerCase().includes(q))
-      .slice(0, limit);
-  };
-
-  const handleTypeInputFocus = (index: number) => {
-    if (typeSuggestBlurRef.current) {
-      clearTimeout(typeSuggestBlurRef.current);
-      typeSuggestBlurRef.current = null;
-    }
-    setActiveTypeSuggestIndex(index);
-  };
-
-  const handleTypeInputBlur = () => {
-    typeSuggestBlurRef.current = setTimeout(
-      () => setActiveTypeSuggestIndex(null),
-      200
-    );
-  };
-
-  const handleSelectTypeSuggestion = (index: number, typeName: string) => {
-    updateOperationRow(index, "typeName", typeName);
-    setActiveTypeSuggestIndex(null);
-  };
 
   const addOperationRow = () => {
     setOperationRows((prev) => [
@@ -283,7 +254,7 @@ export default function WarehouseDetailPage() {
       setOperationRows([{ typeName: "", count: 0, unitPrice: 0 }]);
       setCsvFile(null);
     } catch (e) {
-      setOperationError(e instanceof Error ? e.message : "Operation failed");
+      setOperationError(e instanceof Error ? e.message : t("warehouseDetail.operationFailed"));
     } finally {
       setOperationSubmitting(false);
     }
@@ -310,7 +281,7 @@ export default function WarehouseDetailPage() {
         <div className="flex min-h-[50vh] items-center justify-center p-8">
           <div className="text-center">
             <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
-            <p className="text-muted-foreground">Loading warehouse...</p>
+            <p className="text-muted-foreground">{t("warehouseDetail.loadingWarehouse")}</p>
           </div>
         </div>
       </ProtectedRoute>
@@ -326,18 +297,18 @@ export default function WarehouseDetailPage() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Warehouses
+            {t("warehouseDetail.backToWarehouses")}
           </Link>
           <div className="mt-8 rounded-lg border border-border bg-card p-12 text-center">
-            <h2 className="text-lg font-semibold">Warehouse not found</h2>
+            <h2 className="text-lg font-semibold">{t("warehouseDetail.notFound")}</h2>
             <p className="mt-2 text-muted-foreground">
-              The warehouse may have been deleted or you don&apos;t have access.
+              {t("warehouseDetail.notFoundDesc")}
             </p>
             <Link
               href="/warehouses"
               className="mt-4 inline-block text-primary hover:underline"
             >
-              Back to list
+              {t("warehouseDetail.backToList")}
             </Link>
           </div>
         </div>
@@ -359,7 +330,7 @@ export default function WarehouseDetailPage() {
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Warehouses
+          {t("warehouseDetail.backToWarehouses")}
         </Link>
 
         <div className="mt-6">
@@ -376,38 +347,38 @@ export default function WarehouseDetailPage() {
 
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Details</CardTitle>
-            <CardDescription>Address and location</CardDescription>
+            <CardTitle>{t("warehouseDetail.details")}</CardTitle>
+            <CardDescription>{t("warehouseDetail.addressAndLocation")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p>{warehouse.description || "No description"}</p>
+            <p>{warehouse.description || t("warehouseDetail.noDescription")}</p>
             <p className="text-muted-foreground">{warehouse.address}</p>
-            <p className="text-muted-foreground">Coordinates: {coordStr}</p>
+            <p className="text-muted-foreground">{t("warehouseDetail.coordinates")}: {coordStr}</p>
           </CardContent>
         </Card>
 
         <Card className="mt-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle>Inventory</CardTitle>
-              <CardDescription>Current types and counts</CardDescription>
+              <CardTitle>{t("warehouseDetail.inventory")}</CardTitle>
+              <CardDescription>{t("warehouseDetail.currentTypes")}</CardDescription>
             </div>
             <Button onClick={openOperationModal} size="sm">
               <PackagePlus className="mr-2 h-4 w-4" />
-              New operation
+              {t("warehouseDetail.newOperation")}
             </Button>
           </CardHeader>
           <CardContent>
             {inventory.length === 0 ? (
               <p className="py-6 text-center text-muted-foreground">
-                No inventory yet. Record a load operation to add items.
+                {t("warehouseDetail.noInventory")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type name</TableHead>
-                    <TableHead className="text-right">Count</TableHead>
+                    <TableHead>{t("warehouseDetail.typeName")}</TableHead>
+                    <TableHead className="text-right">{t("warehouseDetail.count")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -427,14 +398,13 @@ export default function WarehouseDetailPage() {
 
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Operation history</CardTitle>
-            <CardDescription>Load and unload operations</CardDescription>
+            <CardTitle>{t("warehouseDetail.operationHistory")}</CardTitle>
+            <CardDescription>{t("warehouseDetail.loadUnloadOps")}</CardDescription>
           </CardHeader>
           <CardContent>
             {flows.length === 0 ? (
               <p className="py-6 text-center text-muted-foreground">
-                No operations yet. Use &quot;New operation&quot; to load or
-                unload items.
+                {t("warehouseDetail.noOperations")}
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -466,11 +436,11 @@ export default function WarehouseDetailPage() {
                         <li key={`${item.typeName}-${i}`}>
                           {item.typeName}: {item.count}
                           {flow.operation === "load"
-                            ? ` — cost: ${item.unitPrice}`
-                            : ` — sell: ${item.unitPrice}`}
+                            ? ` — ${t("warehouseDetail.cost")}: ${item.unitPrice}`
+                            : ` — ${t("warehouseDetail.sell")}: ${item.unitPrice}`}
                           {" · "}
                           <span className="text-muted-foreground">
-                            total: {(item.count * item.unitPrice).toFixed(2)}
+                            {t("warehouseDetail.total")}: {(item.count * item.unitPrice).toFixed(2)}
                           </span>
                         </li>
                       ))}
@@ -485,23 +455,21 @@ export default function WarehouseDetailPage() {
         <Dialog open={operationOpen} onOpenChange={setOperationOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
             <DialogHeader>
-              <DialogTitle>New operation</DialogTitle>
+              <DialogTitle>{t("warehouseDetail.newOperation")}</DialogTitle>
               <p className="text-sm text-muted-foreground">
-                Load adds items (with cost per unit). Unload removes items (with
-                sell price per unit). CSV must have columns: type (or typeName),
-                count (or quantity), price (or unitPrice). Example:{" "}
+                {t("warehouseDetail.csvDescription")}{" "}
                 <a
                   href="/example-flow.csv"
                   download="example-flow.csv"
                   className="text-primary underline hover:no-underline"
                 >
-                  example-flow.csv
+                  {t("warehouseDetail.exampleCsv")}
                 </a>
               </p>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Operation type</Label>
+                <Label>{t("warehouseDetail.operationType")}</Label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2">
                     <input
@@ -511,7 +479,7 @@ export default function WarehouseDetailPage() {
                       onChange={() => setOperationType("load")}
                       className="h-4 w-4"
                     />
-                    Load
+                    {t("warehouseDetail.load")}
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -521,18 +489,14 @@ export default function WarehouseDetailPage() {
                       onChange={() => setOperationType("unload")}
                       className="h-4 w-4"
                     />
-                    Unload
+                    {t("warehouseDetail.unload")}
                   </label>
                 </div>
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label>
-                    Items (type, count,{" "}
-                    {operationType === "load"
-                      ? "cost per unit"
-                      : "sell price per unit"}
-                    )
+                    {t("warehouseDetail.itemsLabel", { priceLabel: operationType === "load" ? t("warehouseDetail.costPerUnit") : t("warehouseDetail.sellPricePerUnit") })}
                   </Label>
                   <div className="flex gap-2">
                     <input
@@ -551,7 +515,7 @@ export default function WarehouseDetailPage() {
                       }
                     >
                       <Upload className="mr-1 h-4 w-4" />
-                      Upload CSV
+                      {t("warehouseDetail.uploadCsv")}
                     </Button>
                     <Button
                       type="button"
@@ -560,7 +524,7 @@ export default function WarehouseDetailPage() {
                       onClick={addOperationRow}
                     >
                       <Plus className="mr-1 h-4 w-4" />
-                      Add row
+                      {t("warehouseDetail.addRow")}
                     </Button>
                   </div>
                 </div>
@@ -568,63 +532,28 @@ export default function WarehouseDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Type name</TableHead>
-                        <TableHead className="w-24">Count</TableHead>
+                        <TableHead>{t("warehouseDetail.typeName")}</TableHead>
+                        <TableHead className="w-24">{t("warehouseDetail.count")}</TableHead>
                         <TableHead className="w-32">
-                          {operationType === "load" ? "Cost/unit" : "Sell/unit"}
+                          {operationType === "load" ? t("warehouseDetail.costUnit") : t("warehouseDetail.sellUnit")}
                         </TableHead>
                         <TableHead className="w-12" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {operationRows.map((row, index) => {
-                        const suggestions = getTypeSuggestions(row.typeName);
-                        const showSuggest =
-                          activeTypeSuggestIndex === index &&
-                          suggestions.length > 0;
                         return (
                           <TableRow key={index}>
-                            <TableCell className="relative align-top overflow-visible">
-                              <div className="relative overflow-visible">
-                                <Input
-                                  value={row.typeName}
-                                  onChange={(e) =>
-                                    updateOperationRow(
-                                      index,
-                                      "typeName",
-                                      e.target.value
-                                    )
-                                  }
-                                  onFocus={() => handleTypeInputFocus(index)}
-                                  onBlur={handleTypeInputBlur}
-                                  placeholder="Type name or choose existing"
-                                  className="h-8"
-                                  autoComplete="off"
-                                />
-                                {showSuggest && (
-                                  <ul
-                                    className="absolute left-0 top-full z-50 mt-1 max-h-48 min-w-full overflow-y-auto overflow-x-hidden rounded-md border bg-popover py-1 text-popover-foreground shadow-md"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                  >
-                                    {suggestions.map((name) => (
-                                      <li
-                                        key={name}
-                                        role="option"
-                                        className="cursor-pointer truncate px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
-                                        onMouseDown={() =>
-                                          handleSelectTypeSuggestion(
-                                            index,
-                                            name
-                                          )
-                                        }
-                                        title={name}
-                                      >
-                                        {name}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
+                            <TableCell className="align-top">
+                              <InventoryCombobox
+                                value={row.typeName}
+                                onValueChange={(v) =>
+                                  updateOperationRow(index, "typeName", v)
+                                }
+                                placeholder="Select product..."
+                                className="h-8 w-full"
+                                extraTypeNames={existingTypeNames}
+                              />
                             </TableCell>
                             <TableCell>
                               <Input
@@ -682,13 +611,13 @@ export default function WarehouseDetailPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOperationOpen(false)}>
-                Cancel
+                {t("warehouseDetail.cancel")}
               </Button>
               <Button
                 onClick={handleSubmitOperation}
                 disabled={!canSubmitOperation || operationSubmitting}
               >
-                {operationSubmitting ? "Submitting…" : "Submit"}
+                {operationSubmitting ? t("warehouseDetail.submitting") : t("warehouseDetail.submit")}
               </Button>
             </DialogFooter>
           </DialogContent>

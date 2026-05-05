@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { AdminRoute } from "@/components/admin-route"
 import { Button } from "@/components/ui/button"
 import { adminApi, SupportCommentItem } from "@/lib/api"
 import { MessageSquare, Trash2 } from "lucide-react"
 
 export default function AdminPage() {
+  const { t } = useTranslation()
   const [comments, setComments] = useState<SupportCommentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -47,16 +49,14 @@ export default function AdminPage() {
   return (
     <AdminRoute>
       <div className="p-6 lg:p-8">
-        <h1 className="text-3xl font-bold tracking-tight">Admin Panel</h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage support comments from users
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("admin.title")}</h1>
+        <p className="mt-1 text-muted-foreground">{t("admin.subtitle")}</p>
 
         <div className="mt-8 rounded-xl border border-border bg-card shadow-sm">
           <div className="border-b border-border px-6 py-4">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <MessageSquare className="h-5 w-5 text-primary" />
-              Support Comments
+              {t("admin.supportComments")}
             </h2>
           </div>
           <div className="p-6">
@@ -66,7 +66,7 @@ export default function AdminPage() {
               </div>
             ) : comments.length === 0 ? (
               <p className="py-12 text-center text-muted-foreground">
-                No comments yet
+                {t("admin.noComments")}
               </p>
             ) : (
               <div className="space-y-4">

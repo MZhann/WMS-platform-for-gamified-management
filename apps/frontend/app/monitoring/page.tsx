@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Bar,
   BarChart,
@@ -53,6 +54,7 @@ import {
   ArrowUpFromLine,
   Sparkles,
 } from "lucide-react";
+import { AiLoadingSteps } from "@/components/ai-loading-steps";
 
 const PIE_COLORS = [
   "hsl(220, 70%, 50%)",
@@ -65,40 +67,8 @@ const PIE_COLORS = [
   "hsl(260, 60%, 55%)",
 ];
 
-const valueChartConfig = {
-  incomingValue: {
-    label: "Value loaded",
-    color: "hsl(220, 70%, 50%)",
-  },
-  outgoingValue: {
-    label: "Value unloaded",
-    color: "hsl(0, 84%, 60%)",
-  },
-} satisfies ChartConfig;
-
-const quantityChartConfig = {
-  incomingCount: {
-    label: "Incoming",
-    color: "hsl(30, 80%, 55%)",
-  },
-  outgoingCount: {
-    label: "Outgoing",
-    color: "hsl(280, 65%, 60%)",
-  },
-} satisfies ChartConfig;
-
-const flowByTypeChartConfig = {
-  loaded: {
-    label: "Loaded",
-    color: "hsl(142, 76%, 36%)",
-  },
-  unloaded: {
-    label: "Unloaded",
-    color: "hsl(0, 84%, 60%)",
-  },
-} satisfies ChartConfig;
-
 export default function MonitoringPage() {
+  const { t } = useTranslation();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [filteredWarehouses, setFilteredWarehouses] = useState<Warehouse[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(
@@ -115,6 +85,39 @@ export default function MonitoringPage() {
   const [aiAdvice, setAiAdvice] = useState<AiAdviceResponse | null>(null);
   const [aiAdviceLoading, setAiAdviceLoading] = useState(false);
   const [aiAdviceError, setAiAdviceError] = useState<string | null>(null);
+
+  const valueChartConfig = {
+    incomingValue: {
+      label: t("monitoring.valueLoaded"),
+      color: "hsl(220, 70%, 50%)",
+    },
+    outgoingValue: {
+      label: t("monitoring.valueUnloaded"),
+      color: "hsl(0, 84%, 60%)",
+    },
+  } satisfies ChartConfig;
+
+  const quantityChartConfig = {
+    incomingCount: {
+      label: t("monitoring.incoming"),
+      color: "hsl(30, 80%, 55%)",
+    },
+    outgoingCount: {
+      label: t("monitoring.outgoing"),
+      color: "hsl(280, 65%, 60%)",
+    },
+  } satisfies ChartConfig;
+
+  const flowByTypeChartConfig = {
+    loaded: {
+      label: t("monitoring.loaded"),
+      color: "hsl(142, 76%, 36%)",
+    },
+    unloaded: {
+      label: t("monitoring.unloaded"),
+      color: "hsl(0, 84%, 60%)",
+    },
+  } satisfies ChartConfig;
 
   useEffect(() => {
     const loadWarehouses = async () => {
@@ -169,7 +172,7 @@ export default function MonitoringPage() {
       .catch((err) => {
         if (!cancelled)
           setAnalyticsError(
-            err instanceof Error ? err.message : "Failed to load analytics"
+            err instanceof Error ? err.message : t("monitoring.failedToLoadAnalytics")
           );
       })
       .finally(() => {
@@ -193,7 +196,7 @@ export default function MonitoringPage() {
       .catch((err) => {
         if (!cancelled)
           setAiAdviceError(
-            err instanceof Error ? err.message : "Failed to load AI advice"
+            err instanceof Error ? err.message : t("monitoring.failedToLoadAiAdvice")
           );
       })
       .finally(() => {
@@ -210,7 +213,7 @@ export default function MonitoringPage() {
         <div className="flex min-h-[50vh] items-center justify-center p-8">
           <div className="text-center">
             <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
-            <p className="text-muted-foreground">Loading warehouses...</p>
+            <p className="text-muted-foreground">{t("monitoring.loadingWarehouses")}</p>
           </div>
         </div>
       </ProtectedRoute>
@@ -222,9 +225,9 @@ export default function MonitoringPage() {
       <div className="p-6 lg:p-8">
         <div className="flex items-center justify-between">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Monitoring</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t("monitoring.title")}</h1>
             <p className="mt-1 text-muted-foreground">
-              Track inventory, product flow, and value across your warehouses
+              {t("monitoring.subtitle")}
             </p>
           </div>
           <button
@@ -234,7 +237,7 @@ export default function MonitoringPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-violet-500/30 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Sparkles className="h-4 w-4" />
-            AI Advice
+            {t("monitoring.aiAdvice")}
           </button>
         </div>
 
@@ -242,7 +245,7 @@ export default function MonitoringPage() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search warehouses..."
+              placeholder={t("monitoring.searchWarehouses")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -268,22 +271,22 @@ export default function MonitoringPage() {
         {warehouses.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-12 text-center">
             <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">No warehouses yet</h3>
+            <h3 className="mt-4 text-lg font-semibold">{t("monitoring.noWarehousesYet")}</h3>
             <p className="mt-2 text-muted-foreground">
-              Create warehouses on the map to see monitoring data here
+              {t("monitoring.noWarehousesDesc")}
             </p>
           </div>
         ) : !selectedWarehouse ? (
           <div className="rounded-lg border border-border bg-card p-12 text-center">
             <p className="text-muted-foreground">
-              Select a warehouse to view data
+              {t("monitoring.selectWarehouse")}
             </p>
           </div>
         ) : analyticsLoading ? (
           <div className="flex min-h-[40vh] items-center justify-center rounded-lg border border-border bg-card">
             <div className="text-center">
               <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
-              <p className="text-muted-foreground">Loading analytics...</p>
+              <p className="text-muted-foreground">{t("monitoring.loadingAnalytics")}</p>
             </div>
           </div>
         ) : analyticsError ? (
@@ -300,7 +303,7 @@ export default function MonitoringPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      Total items
+                      {t("monitoring.totalItems")}
                     </p>
                     <p className="text-2xl font-bold">
                       {analytics.summary.totalItems.toLocaleString()}
@@ -315,7 +318,7 @@ export default function MonitoringPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      Product types
+                      {t("monitoring.productTypes")}
                     </p>
                     <p className="text-2xl font-bold">
                       {analytics.summary.typeCount.toLocaleString()}
@@ -330,7 +333,7 @@ export default function MonitoringPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      Incoming value
+                      {t("monitoring.incomingValue")}
                     </p>
                     <p className="text-2xl font-bold">
                       $
@@ -349,7 +352,7 @@ export default function MonitoringPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      Outgoing value
+                      {t("monitoring.outgoingValue")}
                     </p>
                     <p className="text-2xl font-bold">
                       $
@@ -367,11 +370,11 @@ export default function MonitoringPage() {
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
                   <DollarSign className="h-5 w-5 text-emerald-500" />
-                  Value of loads vs unloads
+                  {t("monitoring.valueLoadsUnloads")}
                 </h3>
                 {analytics.flowTimeSeries.length === 0 ? (
                   <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                    No flow data in this period
+                    {t("monitoring.noFlowData")}
                   </div>
                 ) : (
                   <ChartContainer
@@ -413,11 +416,11 @@ export default function MonitoringPage() {
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
                   <TrendingUp className="h-5 w-5 text-blue-500" />
-                  Product flow (units)
+                  {t("monitoring.productFlowUnits")}
                 </h3>
                 {analytics.flowTimeSeries.length === 0 ? (
                   <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                    No flow data in this period
+                    {t("monitoring.noFlowData")}
                   </div>
                 ) : (
                   <ChartContainer
@@ -463,11 +466,11 @@ export default function MonitoringPage() {
 
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <h3 className="mb-4 text-lg font-semibold">
-                  Inventory by type
+                  {t("monitoring.inventoryByType")}
                 </h3>
                 {analytics.inventoryByType.length === 0 ? (
                   <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                    No inventory data
+                    {t("monitoring.noInventoryData")}
                   </div>
                 ) : (
                   <div className="h-[280px] w-full">
@@ -525,11 +528,11 @@ export default function MonitoringPage() {
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
                   <TrendingDown className="h-5 w-5 text-amber-500" />
-                  Top moved product types
+                  {t("monitoring.topMovedTypes")}
                 </h3>
                 {analytics.flowByType.length === 0 ? (
                   <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                    No flow data yet
+                    {t("monitoring.noFlowDataYet")}
                   </div>
                 ) : (
                   <ChartContainer
@@ -572,8 +575,8 @@ export default function MonitoringPage() {
                             <div className="rounded-lg border border-border bg-background px-3 py-2 shadow-md">
                               <p className="font-medium">{row.fullName}</p>
                               <p className="text-sm text-muted-foreground">
-                                Loaded: {row.loaded.toLocaleString()} ·
-                                Unloaded: {row.unloaded.toLocaleString()}
+                                {t("monitoring.loaded")}: {row.loaded.toLocaleString()} ·{" "}
+                                {t("monitoring.unloaded")}: {row.unloaded.toLocaleString()}
                               </p>
                             </div>
                           );
@@ -607,17 +610,20 @@ export default function MonitoringPage() {
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-violet-500" />
-                AI Advice
+                {t("monitoring.aiAdvice")}
               </SheetTitle>
             </SheetHeader>
             <div className="mt-4 flex flex-1 flex-col gap-6">
               {aiAdviceLoading && (
-                <div className="flex flex-col items-center justify-center gap-4 py-12">
-                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
-                  <p className="text-sm text-muted-foreground">
-                    Analyzing warehouse data…
-                  </p>
-                </div>
+                <AiLoadingSteps
+                  steps={[
+                    "monitoring.aiStep1",
+                    "monitoring.aiStep2",
+                    "monitoring.aiStep3",
+                    "monitoring.aiStep4",
+                  ]}
+                  intervalMs={3500}
+                />
               )}
               {!aiAdviceLoading && aiAdviceError && (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center">
@@ -636,14 +642,14 @@ export default function MonitoringPage() {
                             setAiAdviceError(
                               err instanceof Error
                                 ? err.message
-                                : "Failed to load AI advice"
+                                : t("monitoring.failedToLoadAiAdvice")
                             )
                           )
                           .finally(() => setAiAdviceLoading(false));
                     }}
                     className="mt-3 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
                   >
-                    Retry
+                    {t("monitoring.retry")}
                   </button>
                 </div>
               )}
@@ -653,7 +659,7 @@ export default function MonitoringPage() {
                   {aiAdvice.recommendations.length > 0 && (
                     <div>
                       <h4 className="mb-2 text-sm font-semibold">
-                        Recommendations
+                        {t("monitoring.recommendations")}
                       </h4>
                       <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                         {aiAdvice.recommendations.map((rec, i) => (

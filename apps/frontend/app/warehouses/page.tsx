@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { ProtectedRoute } from "@/components/protected-route"
 import {
   Table,
@@ -17,6 +18,7 @@ import { warehouseApi, Warehouse } from "@/lib/api"
 import { Package } from "lucide-react"
 
 export default function WarehousesPage() {
+  const { t } = useTranslation()
   const router = useRouter()
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,7 +32,7 @@ export default function WarehousesPage() {
         const res = await warehouseApi.getAll()
         setWarehouses(res.warehouses)
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load warehouses")
+        setError(e instanceof Error ? e.message : t("warehouses.failedToLoad"))
       } finally {
         setLoading(false)
       }
@@ -44,7 +46,7 @@ export default function WarehousesPage() {
         <div className="flex min-h-[50vh] items-center justify-center p-8">
           <div className="text-center">
             <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
-            <p className="text-muted-foreground">Loading warehouses...</p>
+            <p className="text-muted-foreground">{t("warehouses.loadingWarehouses")}</p>
           </div>
         </div>
       </ProtectedRoute>
@@ -55,9 +57,9 @@ export default function WarehousesPage() {
     <ProtectedRoute>
       <div className="p-6 lg:p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Warehouses</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("warehouses.title")}</h1>
           <p className="mt-1 text-muted-foreground">
-            View inventory summary and manage items by warehouse
+            {t("warehouses.subtitle")}
           </p>
         </div>
 
@@ -71,15 +73,15 @@ export default function WarehousesPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-12 text-center">
               <Package className="h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No warehouses yet</h3>
+              <h3 className="mt-4 text-lg font-semibold">{t("warehouses.noWarehousesYet")}</h3>
               <p className="mt-2 text-muted-foreground">
-                Create warehouses on the map to see them here
+                {t("warehouses.createOnMap")}
               </p>
               <Link
                 href="/"
                 className="mt-4 text-sm font-medium text-primary hover:underline"
               >
-                Go to map
+                {t("warehouses.goToMap")}
               </Link>
             </CardContent>
           </Card>
@@ -88,9 +90,9 @@ export default function WarehousesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Warehouse name</TableHead>
-                  <TableHead className="text-right">Total items</TableHead>
-                  <TableHead className="text-right">Type count</TableHead>
+                  <TableHead>{t("warehouses.warehouseName")}</TableHead>
+                  <TableHead className="text-right">{t("warehouses.totalItems")}</TableHead>
+                  <TableHead className="text-right">{t("warehouses.typeCount")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

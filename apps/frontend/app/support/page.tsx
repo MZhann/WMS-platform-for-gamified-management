@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { ProtectedRoute } from "@/components/protected-route"
 import { supportApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -44,6 +45,7 @@ function TelegramIcon({ className }: { className?: string }) {
 }
 
 export default function SupportPage() {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const [name, setName] = useState(user?.name ?? "")
   const [email, setEmail] = useState(user?.email ?? "")
@@ -68,7 +70,9 @@ export default function SupportPage() {
       setSubmitted(true)
       setComment("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit comment")
+      setError(
+        err instanceof Error ? err.message : t("support.failedToSubmit")
+      )
     } finally {
       setLoading(false)
     }
@@ -77,30 +81,32 @@ export default function SupportPage() {
   return (
     <ProtectedRoute>
       <div className="p-6 lg:p-8">
-        <h1 className="text-3xl font-bold tracking-tight">Support</h1>
-        <p className="mt-1 text-muted-foreground">
-          Get help or leave feedback. We&apos;re here for you.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {t("support.title")}
+        </h1>
+        <p className="mt-1 text-muted-foreground">{t("support.subtitle")}</p>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-2">
           {/* Comment form */}
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
               <MessageSquare className="h-5 w-5 text-primary" />
-              Leave a comment
+              {t("support.leaveComment")}
             </h2>
             {submitted ? (
               <div className="rounded-lg border border-border bg-muted/50 p-4 text-center">
-                <p className="font-medium text-primary">Thank you for your feedback!</p>
+                <p className="font-medium text-primary">
+                  {t("support.thankYou")}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  We&apos;ll get back to you as soon as possible.
+                  {t("support.getBackSoon")}
                 </p>
                 <Button
                   variant="outline"
                   className="mt-4"
                   onClick={() => setSubmitted(false)}
                 >
-                  Send another message
+                  {t("support.sendAnother")}
                 </Button>
               </div>
             ) : (
@@ -111,31 +117,31 @@ export default function SupportPage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">{t("support.nameLabel")}</Label>
                   <Input
                     id="name"
-                    placeholder="Your name"
+                    placeholder={t("support.namePlaceholder")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t("support.emailLabel")}</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="your@email.com"
+                    placeholder={t("support.emailPlaceholder")}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="comment">Comment / Message</Label>
+                  <Label htmlFor="comment">{t("support.commentLabel")}</Label>
                   <Textarea
                     id="comment"
-                    placeholder="How can we help? Describe your question or feedback..."
+                    placeholder={t("support.commentPlaceholder")}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={5}
@@ -147,7 +153,7 @@ export default function SupportPage() {
                   className="w-full sm:w-auto"
                   disabled={loading}
                 >
-                  {loading ? "Sending..." : "Send comment"}
+                  {loading ? t("support.sending") : t("support.sendComment")}
                 </Button>
               </form>
             )}
@@ -155,9 +161,11 @@ export default function SupportPage() {
 
           {/* Contact buttons */}
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold">Connect with us</h2>
+            <h2 className="mb-4 text-lg font-semibold">
+              {t("support.connectWithUs")}
+            </h2>
             <p className="mb-6 text-sm text-muted-foreground">
-              Reach out via your preferred channel. We typically respond within 24 hours.
+              {t("support.connectDesc")}
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button
@@ -183,7 +191,7 @@ export default function SupportPage() {
               >
                 <a href={`tel:${SUPPORT_PHONE}`}>
                   <Phone className="h-5 w-5" />
-                  Call us
+                  {t("support.callUs")}
                 </a>
               </Button>
               <Button

@@ -1,11 +1,13 @@
 "use client"
 
 import { usePathname } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { useAuth } from "@/contexts/AuthContext"
 import { Sidebar } from "@/components/sidebar"
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { t } = useTranslation()
   const { isAuthenticated, loading } = useAuth()
 
   // Don't show sidebar on login/register pages
@@ -20,7 +22,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t("app.loading")}</p>
         </div>
       </div>
     )

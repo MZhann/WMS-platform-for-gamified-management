@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   Dialog,
   DialogContent,
@@ -28,22 +29,21 @@ export function WarehouseFormModal({
   onSubmit,
   coordinates,
 }: WarehouseFormModalProps) {
+  const { t } = useTranslation()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [address, setAddress] = useState("")
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
 
-  // Fetch address from coordinates using reverse geocoding
   useEffect(() => {
     if (!coordinates || !isOpen) return
 
     setIsLoadingAddress(true)
-    // Using Mapbox Geocoding API for reverse geocoding
     const fetchAddress = async () => {
       try {
         const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ""
         if (!token) {
-          setAddress("Address unavailable (Mapbox token missing)")
+          setAddress(t("warehouseForm.addressMissingToken"))
           setIsLoadingAddress(false)
           return
         }
@@ -58,22 +58,21 @@ export function WarehouseFormModal({
 
         const data = await response.json()
         if (data.features && data.features.length > 0) {
-          setAddress(data.features[0].place_name || "Address not found")
+          setAddress(data.features[0].place_name || t("warehouseForm.addressNotFound"))
         } else {
-          setAddress("Address not found")
+          setAddress(t("warehouseForm.addressNotFound"))
         }
       } catch (error) {
         console.error("Error fetching address:", error)
-        setAddress("Address unavailable")
+        setAddress(t("warehouseForm.addressUnavailable"))
       } finally {
         setIsLoadingAddress(false)
       }
     }
 
     fetchAddress()
-  }, [coordinates, isOpen])
+  }, [coordinates, isOpen, t])
 
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
       setName("")
@@ -89,7 +88,7 @@ export function WarehouseFormModal({
     onSubmit({
       name: name.trim(),
       description: description.trim(),
-      address: address || "Address not available",
+      address: address || t("warehouseForm.addressUnavailable"),
       coordinates,
     })
   }
@@ -98,60 +97,60 @@ export function WarehouseFormModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Warehouse</DialogTitle>
+          <DialogTitle>{t("warehouseForm.createTitle")}</DialogTitle>
           <DialogDescription>
-            Add a new warehouse at the selected location on the map.
+            {t("warehouseForm.createDesc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">
-                Warehouse Name <span className="text-red-500">*</span>
+                {t("warehouseForm.warehouseName")} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter warehouse name"
+                placeholder={t("warehouseForm.warehouseNamePlaceholder")}
                 required
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("warehouseForm.description")}</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter warehouse description"
+                placeholder={t("warehouseForm.descriptionPlaceholder")}
                 rows={3}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">{t("warehouseForm.address")}</Label>
               <Input
                 id="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder={isLoadingAddress ? "Loading address..." : "Address will be auto-filled"}
+                placeholder={isLoadingAddress ? t("warehouseForm.loadingAddress") : t("warehouseForm.addressAutoFill")}
                 disabled={isLoadingAddress}
               />
               {isLoadingAddress && (
-                <p className="text-xs text-muted-foreground">Fetching address from coordinates...</p>
+                <p className="text-xs text-muted-foreground">{t("warehouseForm.fetchingAddress")}</p>
               )}
             </div>
             {coordinates && (
               <div className="text-xs text-muted-foreground">
-                Coordinates: {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
+                {t("warehouseForm.coordinates")}: {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
               </div>
             )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("warehouseForm.cancel")}
             </Button>
             <Button type="submit" disabled={!name.trim() || isLoadingAddress}>
-              Create Warehouse
+              {t("warehouseForm.createWarehouse")}
             </Button>
           </DialogFooter>
         </form>
