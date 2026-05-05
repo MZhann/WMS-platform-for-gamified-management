@@ -84,7 +84,7 @@ export async function startTelegramBot(app?: Express): Promise<void> {
   const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL
   if (webhookUrl && app) {
     const webhookPath = `/telegram-webhook/${token}`
-    app.use(webhookPath, bot.webhookCallback(webhookPath))
+    app.use(bot.webhookCallback(webhookPath))
     await bot.telegram.setWebhook(`${webhookUrl}${webhookPath}`)
     console.log(`📱 Telegram bot started (webhook: ${webhookUrl})`)
   } else {
