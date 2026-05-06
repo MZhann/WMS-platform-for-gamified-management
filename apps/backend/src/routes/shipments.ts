@@ -199,28 +199,45 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
       packedQty: 0,
     }))
 
-    const shipmentNumber = await generateShipmentNumber()
-
-    const shipment = new Shipment({
-      shipmentNumber,
-      orderId: order._id,
-      orderNumber: order.orderNumber,
-      warehouseId: order.warehouseId,
-      userId: req.user.id,
-      status: "pending",
-      carrier: carrier || "",
-      trackingNumber: trackingNumber || "",
-      items,
-      notes: notes || "",
-      audit: [{
-        action: "created",
-        toStatus: "pending",
-        performedBy: req.user.id,
-        timestamp: new Date(),
-      }],
-    })
-
-    await shipment.save()
+    let shipment: InstanceType<typeof Shipment> | null = null
+    let lastErr: any = null
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const shipmentNumber = await generateShipmentNumber()
+      const candidate = new Shipment({
+        shipmentNumber,
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        warehouseId: order.warehouseId,
+        userId: req.user.id,
+        status: "pending",
+        carrier: carrier || "",
+        trackingNumber: trackingNumber || "",
+        items,
+        notes: notes || "",
+        audit: [{
+          action: "created",
+          toStatus: "pending",
+          performedBy: req.user.id,
+          timestamp: new Date(),
+        }],
+      })
+      try {
+        await candidate.save()
+        shipment = candidate
+        break
+      } catch (err: any) {
+        lastErr = err
+        if (err?.code === 11000 && err?.keyPattern?.shipmentNumber) {
+          continue
+        }
+        throw err
+      }
+    }
+    if (!shipment) {
+      console.error("Create shipment — exhausted retries:", lastErr)
+      res.status(500).json({ error: "Could not allocate shipment number, try again" })
+      return
+    }
 
     if (order.status === "confirmed") {
       const fromStatus = order.status
@@ -231,7 +248,7 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
         toStatus: "in_progress",
         performedBy: req.user.id as any,
         timestamp: new Date(),
-        note: `Auto-advanced: shipment ${shipmentNumber} created`,
+        note: `Auto-advanced: shipment ${shipment.shipmentNumber} created`,
       })
     }
 
@@ -239,7 +256,7 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
       action: "shipment_created",
       performedBy: req.user.id as any,
       timestamp: new Date(),
-      note: `Shipment ${shipmentNumber} created`,
+      note: `Shipment ${shipment.shipmentNumber} created`,
     })
     await order.save()
 

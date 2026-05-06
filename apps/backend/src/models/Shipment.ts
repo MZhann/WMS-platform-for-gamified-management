@@ -145,18 +145,14 @@ export function canTransitionShipment(from: ShipmentStatus, to: ShipmentStatus):
   return VALID_TRANSITIONS[from]?.includes(to) ?? false
 }
 
-let shipmentCounter: number | null = null
-
 export async function generateShipmentNumber(): Promise<string> {
-  if (shipmentCounter === null) {
-    const latest = await Shipment.findOne().sort({ createdAt: -1 }).lean()
-    if (latest) {
-      const num = parseInt(latest.shipmentNumber.replace(/^SH-/, ""), 10)
-      shipmentCounter = Number.isNaN(num) ? 0 : num
-    } else {
-      shipmentCounter = 0
-    }
+  const latest = await Shipment.findOne({ shipmentNumber: /^SH-\d+$/ })
+    .sort({ shipmentNumber: -1 })
+    .lean()
+  let next = 1
+  if (latest) {
+    const match = latest.shipmentNumber.match(/^SH-(\d+)$/)
+    if (match) next = parseInt(match[1], 10) + 1
   }
-  shipmentCounter++
-  return `SH-${String(shipmentCounter).padStart(5, "0")}`
+  return `SH-${String(next).padStart(5, "0")}`
 }

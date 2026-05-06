@@ -129,19 +129,16 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false
 }
 
-let orderCounter: number | null = null
-
 export async function generateOrderNumber(type: OrderType): Promise<string> {
-  if (orderCounter === null) {
-    const latest = await Order.findOne().sort({ createdAt: -1 }).lean()
-    if (latest) {
-      const num = parseInt(latest.orderNumber.replace(/^(PO|SO)-/, ""), 10)
-      orderCounter = Number.isNaN(num) ? 0 : num
-    } else {
-      orderCounter = 0
-    }
-  }
-  orderCounter++
   const prefix = type === "purchase" ? "PO" : "SO"
-  return `${prefix}-${String(orderCounter).padStart(5, "0")}`
+  const regex = new RegExp(`^${prefix}-\\d+$`)
+  const latest = await Order.findOne({ orderNumber: regex })
+    .sort({ orderNumber: -1 })
+    .lean()
+  let next = 1
+  if (latest) {
+    const match = latest.orderNumber.match(new RegExp(`^${prefix}-(\\d+)$`))
+    if (match) next = parseInt(match[1], 10) + 1
+  }
+  return `${prefix}-${String(next).padStart(5, "0")}`
 }

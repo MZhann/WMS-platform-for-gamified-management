@@ -145,30 +145,47 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
       }
     }
 
-    const orderNumber = await generateOrderNumber(orderType)
-
-    const order = new Order({
-      orderNumber,
-      orderType,
-      status: "draft",
-      warehouseId: warehouse._id,
-      userId: req.user.id,
-      counterparty: String(counterparty).trim(),
-      items,
-      notes: notes || "",
-      audit: [{
-        action: "created",
-        toStatus: "draft",
-        performedBy: req.user.id,
-        timestamp: new Date(),
-      }],
-    })
-
-    await order.save()
+    let savedOrder: InstanceType<typeof Order> | null = null
+    let lastErr: any = null
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const orderNumber = await generateOrderNumber(orderType)
+      const order = new Order({
+        orderNumber,
+        orderType,
+        status: "draft",
+        warehouseId: warehouse._id,
+        userId: req.user.id,
+        counterparty: String(counterparty).trim(),
+        items,
+        notes: notes || "",
+        audit: [{
+          action: "created",
+          toStatus: "draft",
+          performedBy: req.user.id,
+          timestamp: new Date(),
+        }],
+      })
+      try {
+        await order.save()
+        savedOrder = order
+        break
+      } catch (err: any) {
+        lastErr = err
+        if (err?.code === 11000 && err?.keyPattern?.orderNumber) {
+          continue
+        }
+        throw err
+      }
+    }
+    if (!savedOrder) {
+      console.error("Create order — exhausted retries:", lastErr)
+      res.status(500).json({ error: "Could not allocate order number, try again" })
+      return
+    }
 
     res.status(201).json({
       message: "Order created successfully",
-      order: toOrderResponse(order),
+      order: toOrderResponse(savedOrder),
     })
   } catch (error: any) {
     console.error("Create order error:", error)
