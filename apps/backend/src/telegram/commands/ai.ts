@@ -5,11 +5,38 @@ import { WarehouseFlow, IWarehouseFlowItem, WarehouseFlowOperation } from "../..
 import { Zone } from "../../models/Zone"
 import { Location } from "../../models/Location"
 import { h, bold, HTML } from "../format"
+import { callGemini } from "../../utils/gemini"
 
 // In-memory cache for putaway item names keyed by chatId.
 // Telegram callback data is limited to 64 bytes, so we can't embed the
 // full typeName. Instead we store it here and reference it by chatId.
 const putawayCache = new Map<number, string>()
+
+// Telegram messages cap at 4096 chars. Keep AI text well below that.
+const MAX_AI_CHARS = 1500
+
+function trimAi(text: string): string {
+  const t = text.trim()
+  if (t.length <= MAX_AI_CHARS) return t
+  return t.slice(0, MAX_AI_CHARS - 1).trimEnd() + "…"
+}
+
+async function tryGeminiText(
+  prompt: string,
+  config: { temperature?: number; maxOutputTokens?: number } = {},
+): Promise<string | null> {
+  try {
+    const raw = await callGemini(prompt, {
+      temperature: config.temperature ?? 0.4,
+      maxOutputTokens: config.maxOutputTokens ?? 600,
+    })
+    const text = raw.trim()
+    return text.length > 0 ? text : null
+  } catch (err: any) {
+    console.warn("Telegram AI call failed:", err?.message || err)
+    return null
+  }
+}
 
 export function registerAiCommands(bot: Telegraf<BotContext>) {
   // ── /forecast ─────────────────────────────────────────────
@@ -89,17 +116,46 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
       return `${riskEmoji[i.risk]} ${h(i.typeName)}\n   Stock: ${i.stock} | Demand: ${i.avgDailyDemand.toFixed(1)}/day | ${days}`
     })
 
-    const msg = [
+    // ── Gemini AI narrative on top of the statistics ──
+    const aiContext = {
+      warehouse: warehouse.name,
+      forecastDays,
+      historyDays,
+      summary: { totalProducts: items.length, critical: critCount, high: highCount },
+      topItems: items.slice(0, 12).map((i) => ({
+        typeName: i.typeName,
+        stock: i.stock,
+        avgDailyDemand: Math.round(i.avgDailyDemand * 100) / 100,
+        daysUntilStockout: i.daysUntilStockout,
+        risk: i.risk,
+      })),
+    }
+
+    const aiPrompt = `You are a warehouse demand forecasting expert. Based on the data, write a SHORT (3-5 sentences, max 600 chars) plain-text summary for a warehouse manager. Highlight the most urgent reorder needs, any overstock concerns, and one concrete next-step recommendation. No markdown, no JSON, no headers — just plain prose. Use simple Telegram-friendly text.
+
+Data:
+${JSON.stringify(aiContext, null, 2)}`
+
+    const aiText = await tryGeminiText(aiPrompt, { temperature: 0.4, maxOutputTokens: 400 })
+
+    const lines = [
       `📊 ${bold("Demand Forecast - " + warehouse.name)}`,
       `Period: ${forecastDays} day forecast, ${historyDays} day history`,
       "",
       `🔴 Critical: ${critCount} | 🟠 High: ${highCount} | Total: ${items.length} products`,
-      "",
-      `${bold("Top items by risk:")}`,
-      ...topItems,
-    ].join("\n")
+    ]
 
-    await ctx.editMessageText(msg, HTML)
+    if (aiText) {
+      lines.push("")
+      lines.push(`🤖 ${bold("AI summary")}`)
+      lines.push(h(trimAi(aiText)))
+    }
+
+    lines.push("")
+    lines.push(bold("Top items by risk:"))
+    lines.push(...topItems)
+
+    await ctx.editMessageText(lines.join("\n"), HTML)
   })
 
   // ── /advice ───────────────────────────────────────────────
@@ -137,52 +193,97 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
         createdAt: { $gte: new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000) },
       }).lean()
 
-      const flowByType = new Map<string, { loaded: number; unloaded: number }>()
+      const flowByType = new Map<string, { loaded: number; unloaded: number; inValue: number; outValue: number }>()
       let totalInValue = 0
       let totalOutValue = 0
 
       type FlowRow = { operation: WarehouseFlowOperation; items: IWarehouseFlowItem[] }
       for (const f of flows as FlowRow[]) {
         for (const item of f.items) {
-          const s = flowByType.get(item.typeName) || { loaded: 0, unloaded: 0 }
+          const s = flowByType.get(item.typeName) || { loaded: 0, unloaded: 0, inValue: 0, outValue: 0 }
           if (f.operation === "load") {
             s.loaded += item.count
+            s.inValue += item.count * item.unitPrice
             totalInValue += item.count * item.unitPrice
           } else {
             s.unloaded += item.count
+            s.outValue += item.count * item.unitPrice
             totalOutValue += item.count * item.unitPrice
           }
           flowByType.set(item.typeName, s)
         }
       }
 
-      const recommendations: string[] = []
-
-      if (totalItems === 0) {
-        recommendations.push("Warehouse is empty. Start by stocking essential items.")
-      } else {
-        if (totalOutValue > totalInValue * 1.3) {
-          recommendations.push(
-            `Outgoing ($${totalOutValue.toLocaleString()}) > Incoming ($${totalInValue.toLocaleString()}). Consider restocking.`
-          )
-        }
-        const highDemand = Array.from(flowByType.entries())
-          .filter(([, s]) => s.unloaded > s.loaded * 1.5 && s.unloaded > 0)
-          .sort((a, b) => b[1].unloaded - a[1].unloaded)
-          .slice(0, 3)
-
-        for (const [name, stats] of highDemand) {
-          recommendations.push(
-            `"${name}" demand exceeds supply (${stats.unloaded} out vs ${stats.loaded} in). Reorder soon.`
-          )
-        }
-
-        if (recommendations.length === 0) {
-          recommendations.push("Inventory levels appear balanced. Continue monitoring.")
-        }
+      // ── Try Gemini AI advice first ──
+      const aiContext = {
+        warehouse: { name: warehouse.name, address: warehouse.address },
+        currentDate: new Date().toISOString().slice(0, 10),
+        summary: {
+          totalItems,
+          typeCount: inventory.length,
+          totalInValue: Math.round(totalInValue),
+          totalOutValue: Math.round(totalOutValue),
+        },
+        inventoryByType: inventory.slice(0, 20).map((i) => ({ typeName: i.typeName, count: i.count })),
+        flowByType: Array.from(flowByType.entries())
+          .sort((a, b) => (b[1].loaded + b[1].unloaded) - (a[1].loaded + a[1].unloaded))
+          .slice(0, 15)
+          .map(([typeName, s]) => ({
+            typeName,
+            loaded: s.loaded,
+            unloaded: s.unloaded,
+            net: s.loaded - s.unloaded,
+            inValue: Math.round(s.inValue),
+            outValue: Math.round(s.outValue),
+          })),
       }
 
-      const recLines = recommendations.map((r) => `• ${h(r)}`)
+      const aiPrompt = `You are an expert warehouse and inventory advisor. Based on the data, give SHORT actionable advice (3-6 bullet points, max 1000 chars total) on what to BUY MORE OF and what to REDUCE/SELL OFF. Tie each recommendation to specific numbers from the data. No markdown formatting, no JSON, no headers. Output plain text bullets each starting with "• ". Telegram-friendly.
+
+Data:
+${JSON.stringify(aiContext, null, 2)}`
+
+      const aiText = await tryGeminiText(aiPrompt, { temperature: 0.3, maxOutputTokens: 600 })
+
+      let recommendationsBlock: string[]
+      let source: "ai" | "algorithm"
+
+      if (aiText) {
+        recommendationsBlock = [h(trimAi(aiText))]
+        source = "ai"
+      } else {
+        // Algorithmic fallback
+        const recommendations: string[] = []
+
+        if (totalItems === 0) {
+          recommendations.push("Warehouse is empty. Start by stocking essential items.")
+        } else {
+          if (totalOutValue > totalInValue * 1.3) {
+            recommendations.push(
+              `Outgoing ($${totalOutValue.toLocaleString()}) > Incoming ($${totalInValue.toLocaleString()}). Consider restocking.`,
+            )
+          }
+          const highDemand = Array.from(flowByType.entries())
+            .filter(([, s]) => s.unloaded > s.loaded * 1.5 && s.unloaded > 0)
+            .sort((a, b) => b[1].unloaded - a[1].unloaded)
+            .slice(0, 3)
+
+          for (const [name, stats] of highDemand) {
+            recommendations.push(
+              `"${name}" demand exceeds supply (${stats.unloaded} out vs ${stats.loaded} in). Reorder soon.`,
+            )
+          }
+
+          if (recommendations.length === 0) {
+            recommendations.push("Inventory levels appear balanced. Continue monitoring.")
+          }
+        }
+
+        recommendationsBlock = recommendations.map((r) => `• ${h(r)}`)
+        source = "algorithm"
+      }
+
+      const heading = source === "ai" ? "🤖 AI Recommendations:" : "Recommendations (offline):"
 
       const msg = [
         `💡 ${bold("AI Advice - " + warehouse.name)}`,
@@ -190,8 +291,8 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
         `📦 ${totalItems} items | ${inventory.length} types`,
         `💰 In: $${totalInValue.toLocaleString()} | Out: $${totalOutValue.toLocaleString()}`,
         "",
-        `${bold("Recommendations:")}`,
-        ...recLines,
+        bold(heading),
+        ...recommendationsBlock,
       ].join("\n")
 
       await ctx.editMessageText(msg, HTML)
@@ -226,14 +327,14 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
     }
 
     const buttons = warehouses.map((w) =>
-      Markup.button.callback(w.name, `ai:pw:${w._id}`)
+      Markup.button.callback(w.name, `ai:pw:${w._id}`),
     )
     const rows: ReturnType<typeof Markup.button.callback>[][] = []
     for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2))
 
     await ctx.reply(
       `📍 Smart putaway for "${h(typeName)}"\n\nSelect warehouse:`,
-      { ...Markup.inlineKeyboard(rows), ...HTML }
+      { ...Markup.inlineKeyboard(rows), ...HTML },
     )
   })
 
@@ -255,7 +356,7 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
     ctx: BotContext,
     warehouseId: string,
     typeName: string,
-    editMessage: boolean
+    editMessage: boolean,
   ) {
     const send = async (text: string, opts?: object) => {
       if (editMessage) await ctx.editMessageText!(text, opts)
@@ -271,6 +372,24 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
     const zones = await Zone.find({ warehouseId: warehouse._id }).lean()
     const zoneMap = new Map(zones.map((z) => [z._id.toString(), z]))
 
+    // Compute turnover (90d) to detect fast movers — same heuristic as web /smart-putaway
+    const flows90d = await WarehouseFlow.find({
+      warehouseId: warehouse._id,
+      createdAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+    }).lean()
+
+    const turnoverMap = new Map<string, number>()
+    type FlowRow = { operation: WarehouseFlowOperation; items: IWarehouseFlowItem[] }
+    for (const f of flows90d as FlowRow[]) {
+      for (const item of f.items) {
+        turnoverMap.set(item.typeName, (turnoverMap.get(item.typeName) ?? 0) + item.count)
+      }
+    }
+    const turnoverValues = Array.from(turnoverMap.values())
+    const avgTurnover = turnoverValues.length > 0 ? turnoverValues.reduce((a, b) => a + b, 0) / turnoverValues.length : 0
+    const itemTurnover = turnoverMap.get(typeName) ?? 0
+    const isFastMover = itemTurnover > avgTurnover * 1.5
+
     // Score locations
     const scored = locations
       .map((loc) => {
@@ -282,7 +401,8 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
         let score = Math.min(20, (available / loc.maxCapacity) * 20)
 
         if (loc.inventory.some((i) => i.typeName === typeName)) score += 25
-        if (zone?.type === "storage") score += 10
+        if (isFastMover && zone?.type === "shipping") score += 20
+        else if (!isFastMover && zone?.type === "storage") score += 10
         if (available >= 1) score += 15
 
         return {
@@ -291,26 +411,58 @@ export function registerAiCommands(bot: Telegraf<BotContext>) {
           zoneType: zone?.type || "storage",
           available,
           score: Math.round(score * 100) / 100,
+          hasSameType: loc.inventory.some((i) => i.typeName === typeName),
         }
       })
       .filter(Boolean)
       .sort((a, b) => b!.score - a!.score)
-      .slice(0, 5) as { code: string; zone: string; zoneType: string; available: number; score: number }[]
+      .slice(0, 5) as { code: string; zone: string; zoneType: string; available: number; score: number; hasSameType: boolean }[]
 
     if (scored.length === 0) { await send("No available locations with space."); return }
 
     const lines = scored.map(
-      (s, i) => `${i + 1}. ${bold(s.code)} (${h(s.zone)} - ${h(s.zoneType)})\n   Space: ${s.available} | Score: ${s.score}`
+      (s, i) => `${i + 1}. ${bold(s.code)} (${h(s.zone)} - ${h(s.zoneType)})\n   Space: ${s.available} | Score: ${s.score}`,
     )
 
-    const msg = [
+    // ── Gemini AI rationale ──
+    const aiContext = {
+      item: typeName,
+      isFastMover,
+      itemTurnover90d: itemTurnover,
+      averageTurnover: Math.round(avgTurnover * 100) / 100,
+      candidates: scored.map((s) => ({
+        code: s.code,
+        zone: s.zone,
+        zoneType: s.zoneType,
+        availableSpace: s.available,
+        score: s.score,
+        alreadyContainsSameType: s.hasSameType,
+      })),
+    }
+
+    const aiPrompt = `You are a warehouse layout optimization expert. The system scored 5 candidate locations to put away "${typeName}". Write a SHORT plain-text rationale (2-4 sentences, max 500 chars) for a warehouse worker explaining why the TOP location is the best choice. Mention: zone type fit, available space, fast-mover proximity rules if relevant, and consolidation with same-type stock. No markdown, no JSON, no headers.
+
+Data:
+${JSON.stringify(aiContext, null, 2)}`
+
+    const aiText = await tryGeminiText(aiPrompt, { temperature: 0.3, maxOutputTokens: 300 })
+
+    const out: string[] = [
       `📍 ${bold("Putaway: " + typeName)}`,
       `Warehouse: ${h(warehouse.name)}`,
-      "",
-      `${bold("Recommended locations:")}`,
-      ...lines,
-    ].join("\n")
+      isFastMover ? `🚀 Fast mover (90d turnover: ${itemTurnover})` : `🐢 Standard mover (90d turnover: ${itemTurnover})`,
+    ]
 
-    await send(msg, HTML)
+    if (aiText) {
+      out.push("")
+      out.push(`🤖 ${bold("AI rationale")}`)
+      out.push(h(trimAi(aiText)))
+    }
+
+    out.push("")
+    out.push(bold("Recommended locations:"))
+    out.push(...lines)
+
+    await send(out.join("\n"), HTML)
   }
 }
