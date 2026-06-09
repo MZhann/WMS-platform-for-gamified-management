@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
-import { User, authApi, getToken, setToken, removeToken } from "@/lib/api"
+import { User, UpdateProfileData, authApi, getToken, setToken, removeToken } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "react-i18next"
 
@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name: string) => Promise<void>
+  updateProfile: (data: UpdateProfileData) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
 }
@@ -68,6 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const updateProfile = async (data: UpdateProfileData) => {
+    const response = await authApi.updateProfile(data)
+    setToken(response.token)
+    setUser(response.user)
+  }
+
   const logout = () => {
     removeToken()
     setUser(null)
@@ -81,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         login,
         register,
+        updateProfile,
         logout,
         isAuthenticated: !!user,
       }}

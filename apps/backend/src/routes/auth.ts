@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express"
 import jwt from "jsonwebtoken"
 import { User } from "../models/User"
+import { authenticate, AuthRequest } from "../middleware/auth"
 
 const router = Router()
 
@@ -53,6 +54,7 @@ router.post("/register", async (req: Request, res: Response): Promise<void> => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        avatarUrl: user.avatarUrl ?? "",
         isAdmin: (user as any).isAdmin ?? false,
       },
     })
@@ -118,6 +120,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        avatarUrl: user.avatarUrl ?? "",
         isAdmin: (user as any).isAdmin ?? false,
       },
     })
@@ -161,6 +164,7 @@ router.get("/me", async (req: Request, res: Response): Promise<void> => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        avatarUrl: user.avatarUrl ?? "",
         isAdmin: (user as any).isAdmin ?? false,
       },
     })
@@ -170,6 +174,86 @@ router.get("/me", async (req: Request, res: Response): Promise<void> => {
       return
     }
     console.error("Get user error:", error)
+    res.status(500).json({ error: "Internal server error" })
+  }
+})
+
+// Update current user's profile (name, email, avatar)
+router.patch("/me", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { name, email, avatarUrl, currentPassword, newPassword } = req.body
+
+    // Include password so we can verify the current one when changing it
+    const user = await User.findById(req.user!.id).select("+password")
+    if (!user) {
+      res.status(404).json({ error: "User not found" })
+      return
+    }
+
+    // Ensure the new email isn't taken by another account
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email })
+      if (existingUser) {
+        res.status(400).json({ error: "User with this email already exists" })
+        return
+      }
+      user.email = email
+    }
+
+    if (name !== undefined) user.name = name
+    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl
+
+    // Change password (requires the current one)
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        res.status(400).json({ error: "Password must be at least 6 characters" })
+        return
+      }
+      const isPasswordValid = await user.comparePassword(currentPassword ?? "")
+      if (!isPasswordValid) {
+        res.status(400).json({ error: "Current password is incorrect" })
+        return
+      }
+      user.password = newPassword
+    }
+
+    await user.save()
+
+    // Re-issue token so the embedded name/email stay in sync
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) {
+      res.status(500).json({ error: "Server configuration error" })
+      return
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        isAdmin: user.isAdmin ?? false,
+      },
+      jwtSecret,
+      { expiresIn: "7d" }
+    )
+
+    res.json({
+      message: "Profile updated successfully",
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        avatarUrl: user.avatarUrl ?? "",
+        isAdmin: user.isAdmin ?? false,
+      },
+    })
+  } catch (error: any) {
+    if (error.name === "ValidationError") {
+      res.status(400).json({ error: error.message })
+      return
+    }
+    console.error("Update profile error:", error)
     res.status(500).json({ error: "Internal server error" })
   }
 })

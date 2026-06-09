@@ -53,7 +53,20 @@
   },
   "settings": {
     "title": "Settings",
-    "comingSoon": "Settings page coming soon..."
+    "profileInfo": "Profile Information",
+    "name": "Name",
+    "email": "Email",
+    "changePhoto": "Change Photo",
+    "photoTooLarge": "Image is too large (max 2 MB)",
+    "password": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "passwordHint": "Must be at least 6 characters",
+    "language": "Language",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "saved": "Changes saved",
+    "error": "Failed to save changes"
   },
   "analytics_page": {
     "title": "Analytics",

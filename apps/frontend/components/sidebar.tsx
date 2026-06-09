@@ -76,9 +76,19 @@ export function Sidebar() {
         })}
       </nav>
       <div className="border-t border-border p-4">
-        <div className="mb-3 px-3">
-          <p className="text-sm font-medium text-foreground">{user?.name}</p>
-          <p className="text-xs text-muted-foreground">{user?.email}</p>
+        <div className="mb-3 flex items-center gap-3 px-3">
+          <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-primary/10 flex items-center justify-center">
+            {user?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+            ) : (
+              <User className="h-4 w-4 text-primary" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button

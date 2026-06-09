@@ -5,7 +5,16 @@ export interface User {
   id: string
   email: string
   name: string
+  avatarUrl?: string
   isAdmin?: boolean
+}
+
+export interface UpdateProfileData {
+  name?: string
+  email?: string
+  avatarUrl?: string
+  currentPassword?: string
+  newPassword?: string
 }
 
 export interface AuthResponse {
@@ -200,6 +209,13 @@ export const authApi = {
   getMe: async (): Promise<{ user: User }> => {
     return apiCall<{ user: User }>("/auth/me", {
       method: "GET",
+    })
+  },
+
+  updateProfile: async (data: UpdateProfileData): Promise<AuthResponse> => {
+    return apiCall<AuthResponse>("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
     })
   },
 }
